@@ -1,0 +1,19 @@
+{
+  "lookback_hours": 72,
+  "minimum_age_hours": 4,
+  "max_threads": 30,
+  "ignore_contacts": [],
+  "ignore_group_chats": false,
+  "state_path": "state.sqlite",
+  "use_openai": false,
+  "openai_model": "gpt-4.1-mini",
+  "email": {
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "smtp_username": "you@example.com",
+    "smtp_password_env": "SMS_FOLLOWUP_SMTP_PASSWORD",
+    "from_address": "you@example.com",
+    "to_address": "you@example.com",
+    "subject_prefix": "SMS follow-up"
+  }
+}

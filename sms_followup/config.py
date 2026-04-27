@@ -1,0 +1,57 @@
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from pathlib import Path
+
+
+@dataclass(frozen=True)
+class EmailConfig:
+    smtp_host: str
+    smtp_port: int
+    smtp_username: str
+    smtp_password_env: str
+    from_address: str
+    to_address: str
+    subject_prefix: str = "SMS follow-up"
+
+
+@dataclass(frozen=True)
+class Config:
+    lookback_hours: int
+    minimum_age_hours: int
+    max_threads: int
+    ignore_contacts: frozenset[str]
+    ignore_group_chats: bool
+    use_openai: bool
+    openai_model: str
+    email: EmailConfig
+    messages_db_path: str = "~/Library/Messages/chat.db"
+    state_path: str = "state.sqlite"
+
+
+def load_config(path: Path) -> Config:
+    with path.open("r", encoding="utf-8") as handle:
+        raw = json.load(handle)
+
+    email = raw.get("email", {})
+    return Config(
+        lookback_hours=int(raw.get("lookback_hours", 72)),
+        minimum_age_hours=int(raw.get("minimum_age_hours", 4)),
+        max_threads=int(raw.get("max_threads", 30)),
+        ignore_contacts=frozenset(raw.get("ignore_contacts", [])),
+        ignore_group_chats=bool(raw.get("ignore_group_chats", False)),
+        use_openai=bool(raw.get("use_openai", False)),
+        openai_model=str(raw.get("openai_model", "gpt-4.1-mini")),
+        messages_db_path=str(raw.get("messages_db_path", "~/Library/Messages/chat.db")),
+        state_path=str(raw.get("state_path", "state.sqlite")),
+        email=EmailConfig(
+            smtp_host=str(email["smtp_host"]),
+            smtp_port=int(email.get("smtp_port", 587)),
+            smtp_username=str(email["smtp_username"]),
+            smtp_password_env=str(email.get("smtp_password_env", "SMS_FOLLOWUP_SMTP_PASSWORD")),
+            from_address=str(email["from_address"]),
+            to_address=str(email["to_address"]),
+            subject_prefix=str(email.get("subject_prefix", "SMS follow-up")),
+        ),
+    )
