@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from .config import Config
+from .contacts import ContactResolver
 from .models import Message, Thread
 
 MAC_EPOCH = datetime(2001, 1, 1)
@@ -25,6 +26,7 @@ def load_threads(config: Config) -> list[Thread]:
     grouped: dict[str, list[Message]] = defaultdict(list)
     names: dict[str, str] = {}
     participants: dict[str, set[str]] = defaultdict(set)
+    contacts = ContactResolver.from_config(config)
 
     for row in rows:
         thread_key = str(row["chat_id"])
@@ -32,9 +34,11 @@ def load_threads(config: Config) -> list[Thread]:
         if not text:
             continue
 
-        sender = "Me" if row["is_from_me"] else (row["handle_id"] or "Unknown")
-        display_name = row["display_name"] or row["chat_identifier"] or sender
-        if sender in config.ignore_contacts or display_name in config.ignore_contacts:
+        raw_sender = row["handle_id"] or "Unknown"
+        contact_name = contacts.display_name(raw_sender)
+        sender = "Me" if row["is_from_me"] else (contact_name or raw_sender)
+        display_name = row["display_name"] or contact_name or row["chat_identifier"] or sender
+        if sender in config.ignore_contacts or raw_sender in config.ignore_contacts or display_name in config.ignore_contacts:
             continue
 
         names[thread_key] = display_name

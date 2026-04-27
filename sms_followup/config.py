@@ -23,10 +23,12 @@ class Config:
     max_threads: int
     ignore_contacts: frozenset[str]
     ignore_group_chats: bool
+    resolve_contacts: bool
     use_openai: bool
     openai_model: str
     email: EmailConfig
     messages_db_path: str = "~/Library/Messages/chat.db"
+    contacts_db_glob: str = "~/Library/Application Support/AddressBook/Sources/*/AddressBook-v*.abcddb"
     state_path: str = "state.sqlite"
 
 
@@ -41,9 +43,13 @@ def load_config(path: Path) -> Config:
         max_threads=int(raw.get("max_threads", 30)),
         ignore_contacts=frozenset(raw.get("ignore_contacts", [])),
         ignore_group_chats=bool(raw.get("ignore_group_chats", False)),
+        resolve_contacts=bool(raw.get("resolve_contacts", True)),
         use_openai=bool(raw.get("use_openai", False)),
         openai_model=str(raw.get("openai_model", "gpt-4.1-mini")),
         messages_db_path=str(raw.get("messages_db_path", "~/Library/Messages/chat.db")),
+        contacts_db_glob=str(
+            raw.get("contacts_db_glob", "~/Library/Application Support/AddressBook/Sources/*/AddressBook-v*.abcddb")
+        ),
         state_path=str(raw.get("state_path", "state.sqlite")),
         email=EmailConfig(
             smtp_host=str(email["smtp_host"]),

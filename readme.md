@@ -8,6 +8,8 @@ This project runs locally on your Mac and reads the macOS Messages database at:
 ~/Library/Messages/chat.db
 ```
 
+When enabled, it also reads your local Contacts database so phone numbers in the digest can be shown as contact names.
+
 ## First-Time Setup
 
 1. Copy the example config:
@@ -34,6 +36,8 @@ This project runs locally on your Mac and reads the macOS Messages database at:
 5. Give your terminal or Python runtime Full Disk Access:
 
    System Settings -> Privacy & Security -> Full Disk Access
+
+   This is needed for Messages and may also be needed for Contacts name matching.
 
 6. Run a dry run:
 

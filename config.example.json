@@ -4,6 +4,7 @@
   "max_threads": 30,
   "ignore_contacts": [],
   "ignore_group_chats": false,
+  "resolve_contacts": true,
   "state_path": "state.sqlite",
   "use_openai": false,
   "openai_model": "gpt-4.1-mini",
