@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .analyze import analyze_threads
-from .config import load_config
+from .config import DEFAULT_CONFIG_PATH, load_config
 from .emailer import send_email
 from .messages import load_threads
 from .render import render_email
@@ -15,14 +15,24 @@ from .state import FollowupState
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Email a daily SMS follow-up digest.")
-    parser.add_argument("--config", default="config.json", help="Path to config JSON.")
+    parser.add_argument("--config", default=DEFAULT_CONFIG_PATH, help="Path to config JSON.")
     parser.add_argument("--dry-run", action="store_true", help="Print the email instead of sending it.")
     parser.add_argument("--include-reported", action="store_true", help="Include items already reported previously.")
     parser.add_argument("--test-email", action="store_true", help="Send a simple test email without reading Messages.")
     args = parser.parse_args()
 
+    config_path = Path(args.config).expanduser()
+    _load_dotenv(config_path.parent / ".env")
     _load_dotenv(Path(".env"))
-    config = load_config(Path(args.config))
+    try:
+        config = load_config(config_path)
+    except FileNotFoundError:
+        print(
+            f"Config file not found: {config_path}\n\n"
+            "Run scripts/install_launch_agent.sh from the project directory, or copy "
+            "config.example.json to ~/.sms-followup/config.json and edit it."
+        )
+        return 2
 
     if args.test_email:
         subject = f"{config.email.subject_prefix}: test"

@@ -4,13 +4,14 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.greg.sms-followup</string>
+  <string>__LABEL__</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/greg/sms/scripts/run_daily.sh</string>
+    <string>__RUNNER__</string>
+    <string>__CONFIG__</string>
   </array>
   <key>WorkingDirectory</key>
-  <string>/Users/greg/sms</string>
+  <string>__PROJECT_DIR__</string>
   <key>StartCalendarInterval</key>
   <dict>
     <key>Hour</key>
@@ -19,8 +20,8 @@
     <integer>30</integer>
   </dict>
   <key>StandardOutPath</key>
-  <string>/Users/greg/Library/Logs/sms-followup.out.log</string>
+  <string>__OUT_LOG__</string>
   <key>StandardErrorPath</key>
-  <string>/Users/greg/Library/Logs/sms-followup.err.log</string>
+  <string>__ERR_LOG__</string>
 </dict>
 </plist>

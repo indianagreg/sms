@@ -1,5 +1,13 @@
 #!/bin/sh
 set -eu
 
-cd /Users/greg/sms
-exec /usr/bin/python3 -m sms_followup --config /Users/greg/sms/config.json
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+PROJECT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+CONFIG_PATH="${1:-$HOME/.sms-followup/config.json}"
+PYTHON_BIN="${PYTHON:-/usr/bin/python3}"
+if [ "$#" -gt 0 ]; then
+  shift
+fi
+
+cd "$PROJECT_DIR"
+exec "$PYTHON_BIN" -m sms_followup --config "$CONFIG_PATH" "$@"

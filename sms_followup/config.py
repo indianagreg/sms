@@ -4,6 +4,9 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+DEFAULT_CONFIG_PATH = "~/.sms-followup/config.json"
+DEFAULT_STATE_PATH = "~/.sms-followup/state.sqlite"
+
 
 @dataclass(frozen=True)
 class EmailConfig:
@@ -29,14 +32,16 @@ class Config:
     email: EmailConfig
     messages_db_path: str = "~/Library/Messages/chat.db"
     contacts_db_glob: str = "~/Library/Application Support/AddressBook/Sources/*/AddressBook-v*.abcddb"
-    state_path: str = "state.sqlite"
+    state_path: str = DEFAULT_STATE_PATH
 
 
 def load_config(path: Path) -> Config:
+    path = path.expanduser()
     with path.open("r", encoding="utf-8") as handle:
         raw = json.load(handle)
 
     email = raw.get("email", {})
+    state_path = _resolve_path(str(raw.get("state_path", DEFAULT_STATE_PATH)), path.parent)
     return Config(
         lookback_hours=int(raw.get("lookback_hours", 72)),
         minimum_age_hours=int(raw.get("minimum_age_hours", 4)),
@@ -50,7 +55,7 @@ def load_config(path: Path) -> Config:
         contacts_db_glob=str(
             raw.get("contacts_db_glob", "~/Library/Application Support/AddressBook/Sources/*/AddressBook-v*.abcddb")
         ),
-        state_path=str(raw.get("state_path", "state.sqlite")),
+        state_path=state_path,
         email=EmailConfig(
             smtp_host=str(email["smtp_host"]),
             smtp_port=int(email.get("smtp_port", 587)),
@@ -61,3 +66,10 @@ def load_config(path: Path) -> Config:
             subject_prefix=str(email.get("subject_prefix", "SMS follow-up")),
         ),
     )
+
+
+def _resolve_path(value: str, base_dir: Path) -> str:
+    path = Path(value).expanduser()
+    if path.is_absolute():
+        return str(path)
+    return str(base_dir / path)
