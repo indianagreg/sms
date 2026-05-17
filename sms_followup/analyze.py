@@ -4,7 +4,7 @@ import json
 import os
 import re
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from .config import Config
 from .models import Finding, Message, Thread
@@ -37,14 +37,17 @@ LOW_SIGNAL = {
 
 
 def analyze_threads(threads: list[Thread], config: Config) -> list[Finding]:
-    findings = [_rule_based(thread, config) for thread in threads]
+    if config.use_ai and os.environ.get(config.openrouter_api_key_env):
+        print(f"OpenRouter enabled; reviewing {len(threads)} thread(s) with {config.openrouter_model}.")
+        findings = [_ai_based(thread, config) for thread in threads]
+    else:
+        if config.use_ai:
+            print(f"AI enabled, but {config.openrouter_api_key_env} is not set; using rule-based fallback.")
+        findings = [_rule_based(thread, config) for thread in threads]
+
     findings = [item for item in findings if item is not None]
     findings.sort(key=lambda item: (item.urgency != "high", item.last_message_at))
-    findings = findings[: config.max_threads]
-
-    if config.use_openai and os.environ.get("OPENAI_API_KEY"):
-        return _refine_with_openai(findings, threads, config)
-    return findings
+    return findings[: config.max_threads]
 
 
 def _rule_based(thread: Thread, config: Config) -> Finding | None:
@@ -53,8 +56,8 @@ def _rule_based(thread: Thread, config: Config) -> Finding | None:
         return None
 
     last = messages[-1]
-    now = datetime.now()
-    if now - last.date < timedelta(hours=config.minimum_age_hours):
+    age_hours = _age_hours(last)
+    if age_hours < config.minimum_age_hours:
         return None
 
     if not last.is_from_me:
@@ -89,6 +92,33 @@ def _finding(thread: Thread, message: Message, reason: str, action: str, urgency
     )
 
 
+def _ai_based(thread: Thread, config: Config) -> Finding | None:
+    messages = [msg for msg in thread.messages if _is_meaningful(msg)]
+    if not messages:
+        return None
+
+    last = messages[-1]
+    decision = _classify_thread_with_openrouter(thread, messages, config)
+    if decision.get("_error"):
+        return _rule_based(thread, config)
+    if not decision.get("include", False):
+        return None
+
+    message_id = _decision_message_id(decision, messages)
+    message = next((msg for msg in messages if msg.message_id == message_id), last)
+    urgency = str(decision.get("urgency") or "normal").lower()
+    if urgency not in {"low", "normal", "high"}:
+        urgency = "normal"
+
+    return _finding(
+        thread,
+        message,
+        str(decision.get("reason") or "The conversation appears to need attention."),
+        str(decision.get("suggested_action") or "Review the thread and decide what to do next."),
+        urgency,
+    )
+
+
 def _is_meaningful(message: Message) -> bool:
     normalized = message.text.strip().lower()
     return bool(normalized) and normalized not in LOW_SIGNAL
@@ -106,75 +136,91 @@ def _has_later_inbound_ack(messages: list[Message], commitment: Message) -> bool
     return any(msg.text.strip().lower() in LOW_SIGNAL for msg in later)
 
 
-def _refine_with_openai(findings: list[Finding], threads: list[Thread], config: Config) -> list[Finding]:
-    thread_by_key = {thread.thread_key: thread for thread in threads}
-    refined: list[Finding] = []
-    for finding in findings:
-        thread = thread_by_key.get(finding.thread_key)
-        if thread is None:
-            refined.append(finding)
-            continue
-        decision = _classify_thread_with_openai(thread, finding, config)
-        if decision.get("include", True):
-            refined.append(
-                Finding(
-                    thread_key=finding.thread_key,
-                    message_id=finding.message_id,
-                    display_name=finding.display_name,
-                    reason=str(decision.get("reason") or finding.reason),
-                    suggested_action=str(decision.get("suggested_action") or finding.suggested_action),
-                    urgency=str(decision.get("urgency") or finding.urgency),
-                    last_message_at=finding.last_message_at,
-                    excerpt=finding.excerpt,
-                )
-            )
-    return refined
-
-
-def _classify_thread_with_openai(thread: Thread, finding: Finding, config: Config) -> dict:
+def _classify_thread_with_openrouter(thread: Thread, messages: list[Message], config: Config) -> dict:
     transcript = "\n".join(
-        f"{msg.date:%Y-%m-%d %H:%M} {'Me' if msg.is_from_me else msg.sender}: {msg.text}"
-        for msg in thread.messages[-20:]
+        f"[{msg.message_id}] {msg.date:%Y-%m-%d %H:%M} {'Me' if msg.is_from_me else msg.sender}: {msg.text}"
+        for msg in messages[-20:]
     )
+    last = messages[-1]
     payload = {
-        "model": config.openai_model,
-        "input": [
+        "model": config.openrouter_model,
+        "messages": [
             {
                 "role": "system",
                 "content": (
-                    "Decide whether this SMS/iMessage thread still needs action from Me. "
-                    "Return only compact JSON with include boolean, reason, suggested_action, urgency."
+                    "You analyze SMS/iMessage conversations for a daily follow-up digest. "
+                    "Decide whether this thread currently needs action from Me. Include threads with "
+                    "unanswered direct questions, requests, scheduling/logistics that need confirmation, "
+                    "or commitments Me made that still appear open. Exclude casual concluded exchanges, "
+                    "FYIs, acknowledgments, spam-like messages, and conversations where the other person "
+                    "has already acknowledged or resolved the item. Return only JSON."
                 ),
             },
             {
                 "role": "user",
-                "content": f"Initial reason: {finding.reason}\n\nTranscript:\n{transcript}",
+                "content": (
+                    f"Contact/thread: {thread.display_name}\n"
+                    f"Latest meaningful message age: {_age_hours(last):.1f} hours\n"
+                    f"Configured minimum age for reminders: {config.minimum_age_hours} hours\n\n"
+                    "Return a JSON object with these keys:\n"
+                    "- include: boolean\n"
+                    "- reason: short string\n"
+                    "- suggested_action: short string\n"
+                    "- urgency: one of low, normal, high\n"
+                    "- message_id: integer id of the message most responsible for the decision\n\n"
+                    f"Transcript:\n{transcript}"
+                ),
             },
         ],
-        "text": {"format": {"type": "json_object"}},
+        "response_format": {"type": "json_object"},
     }
     request = urllib.request.Request(
-        "https://api.openai.com/v1/responses",
+        config.openrouter_endpoint,
         data=json.dumps(payload).encode("utf-8"),
         headers={
-            "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
+            "Authorization": f"Bearer {os.environ[config.openrouter_api_key_env]}",
             "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com/indianagreg/sms",
+            "X-Title": "SMS Follow-Up Digest",
         },
         method="POST",
     )
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
             data = json.loads(response.read().decode("utf-8"))
-        text = data.get("output_text") or _extract_output_text(data)
-        return json.loads(text)
+        return _parse_model_json(_extract_chat_content(data))
     except Exception:
-        return {"include": True}
+        return {"_error": "openrouter_request_failed"}
 
 
-def _extract_output_text(data: dict) -> str:
-    parts = []
-    for item in data.get("output", []):
-        for content in item.get("content", []):
-            if "text" in content:
-                parts.append(content["text"])
-    return "".join(parts)
+def _age_hours(message: Message) -> float:
+    return (datetime.now() - message.date).total_seconds() / 3600
+
+
+def _decision_message_id(decision: dict, messages: list[Message]) -> int:
+    try:
+        return int(decision.get("message_id"))
+    except (TypeError, ValueError):
+        return messages[-1].message_id
+
+
+def _extract_chat_content(data: dict) -> str:
+    choices = data.get("choices") or []
+    if not choices:
+        return "{}"
+    message = choices[0].get("message") or {}
+    content = message.get("content") or "{}"
+    if isinstance(content, list):
+        return "".join(str(part.get("text", "")) for part in content if isinstance(part, dict))
+    return str(content)
+
+
+def _parse_model_json(text: str) -> dict:
+    text = text.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return {"_error": "invalid_model_json"}

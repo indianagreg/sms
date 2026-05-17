@@ -27,8 +27,10 @@ class Config:
     ignore_contacts: frozenset[str]
     ignore_group_chats: bool
     resolve_contacts: bool
-    use_openai: bool
-    openai_model: str
+    use_ai: bool
+    openrouter_model: str
+    openrouter_api_key_env: str
+    openrouter_endpoint: str
     email: EmailConfig
     messages_db_path: str = "~/Library/Messages/chat.db"
     contacts_db_glob: str = "~/Library/Application Support/AddressBook/Sources/*/AddressBook-v*.abcddb"
@@ -49,8 +51,10 @@ def load_config(path: Path) -> Config:
         ignore_contacts=frozenset(raw.get("ignore_contacts", [])),
         ignore_group_chats=bool(raw.get("ignore_group_chats", False)),
         resolve_contacts=bool(raw.get("resolve_contacts", True)),
-        use_openai=bool(raw.get("use_openai", False)),
-        openai_model=str(raw.get("openai_model", "gpt-4.1-mini")),
+        use_ai=bool(raw.get("use_ai", raw.get("use_openrouter", raw.get("use_openai", False)))),
+        openrouter_model=str(raw.get("openrouter_model", raw.get("openai_model", "openai/gpt-4.1-mini"))),
+        openrouter_api_key_env=str(raw.get("openrouter_api_key_env", "OPENROUTER_API_KEY")),
+        openrouter_endpoint=str(raw.get("openrouter_endpoint", "https://openrouter.ai/api/v1/chat/completions")),
         messages_db_path=str(raw.get("messages_db_path", "~/Library/Messages/chat.db")),
         contacts_db_glob=str(
             raw.get("contacts_db_glob", "~/Library/Application Support/AddressBook/Sources/*/AddressBook-v*.abcddb")

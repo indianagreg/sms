@@ -33,7 +33,7 @@ When enabled, it also reads your local Contacts database so phone numbers in the
 
    ```sh
    SMS_FOLLOWUP_SMTP_PASSWORD="your gmail app password"
-   OPENAI_API_KEY="your openai api key"
+   OPENROUTER_API_KEY="your openrouter api key"
    ```
 
    Then lock down the file:
@@ -72,15 +72,22 @@ When enabled, it also reads your local Contacts database so phone numbers in the
    python3 -m sms_followup
    ```
 
-## Optional LLM Analysis
+## Optional AI Analysis
 
-The built-in rule-based detector works without dependencies. For better judgment, set:
+The built-in rule-based detector works without dependencies. For better judgment across every conversation in the lookback window, set:
 
 ```sh
-export OPENAI_API_KEY="..."
+export OPENROUTER_API_KEY="..."
 ```
 
-Then set `"use_openai": true` in `~/.sms-followup/config.json`.
+Then set these in `~/.sms-followup/config.json`:
+
+```json
+"use_ai": true,
+"openrouter_model": "openai/gpt-4.1-mini"
+```
+
+You can change `openrouter_model` to any model ID supported by OpenRouter.
 
 ## Daily Scheduling
 

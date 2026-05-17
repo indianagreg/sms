@@ -27,9 +27,9 @@ if [ ! -f "$CONFIG" ]; then
 fi
 
 if [ ! -f "$ENV_FILE" ]; then
-  cat > "$ENV_FILE" <<'EOF'
+cat > "$ENV_FILE" <<'EOF'
 SMS_FOLLOWUP_SMTP_PASSWORD=""
-OPENAI_API_KEY=""
+OPENROUTER_API_KEY=""
 EOF
   chmod 600 "$ENV_FILE"
   echo "Created secrets template: $ENV_FILE"
