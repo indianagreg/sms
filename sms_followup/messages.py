@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 import sqlite3
 import tempfile
+import re
 from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -30,7 +31,7 @@ def load_threads(config: Config) -> list[Thread]:
 
     for row in rows:
         thread_key = str(row["chat_id"])
-        text = _clean_text(row["text"])
+        text = _message_text(row)
         if not text:
             continue
 
@@ -80,6 +81,7 @@ def _query_messages(db_path: Path, lookback_hours: int) -> list[sqlite3.Row]:
             message.date AS date,
             message.is_from_me AS is_from_me,
             message.text AS text,
+            message.attributedBody AS attributed_body,
             handle.id AS handle_id
         FROM message
         JOIN chat_message_join ON chat_message_join.message_id = message.ROWID
@@ -120,3 +122,31 @@ def _clean_text(value: str | None) -> str:
     if not value:
         return ""
     return " ".join(value.replace("\ufffc", " ").split())
+
+
+def _message_text(row: sqlite3.Row) -> str:
+    text = _clean_text(row["text"])
+    if text:
+        return text
+    return _clean_text(_extract_attributed_body(row["attributed_body"]))
+
+
+def _extract_attributed_body(value: bytes | None) -> str:
+    if not value:
+        return ""
+
+    decoded = value.decode("utf-8", errors="ignore")
+    if "NSString" in decoded:
+        decoded = decoded.split("NSString", 1)[1]
+
+    for marker in ("NSDictionary", "__kIM", "NSNumber", "NSObject", "NSValue"):
+        if marker in decoded:
+            decoded = decoded.split(marker, 1)[0]
+
+    decoded = decoded.replace("\ufffc", " ")
+    decoded = re.sub(r"[\x00-\x1f\x7f-\x9f]", " ", decoded)
+    decoded = re.sub(r"\s+", " ", decoded).strip()
+
+    # NSKeyedArchiver blobs can leave a few binary length bytes before the text.
+    decoded = re.sub(r"^[^A-Za-z0-9@#'$\"“‘¿¡(\[]+", "", decoded)
+    return decoded
