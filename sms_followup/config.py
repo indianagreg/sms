@@ -12,6 +12,7 @@ DEFAULT_STATE_PATH = "~/.sms-followup/state.sqlite"
 class EmailConfig:
     smtp_host: str
     smtp_port: int
+    smtp_use_ssl: bool
     smtp_username: str
     smtp_password_env: str
     from_address: str
@@ -63,6 +64,7 @@ def load_config(path: Path) -> Config:
         email=EmailConfig(
             smtp_host=str(email["smtp_host"]),
             smtp_port=int(email.get("smtp_port", 587)),
+            smtp_use_ssl=bool(email.get("smtp_use_ssl", int(email.get("smtp_port", 587)) == 465)),
             smtp_username=str(email["smtp_username"]),
             smtp_password_env=str(email.get("smtp_password_env", "SMS_FOLLOWUP_SMTP_PASSWORD")),
             from_address=str(email["from_address"]),

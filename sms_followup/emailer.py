@@ -18,7 +18,9 @@ def send_email(subject: str, body: str, config: Config) -> None:
     message["To"] = config.email.to_address
     message.set_content(body)
 
-    with smtplib.SMTP(config.email.smtp_host, config.email.smtp_port) as smtp:
-        smtp.starttls()
+    smtp_class = smtplib.SMTP_SSL if config.email.smtp_use_ssl else smtplib.SMTP
+    with smtp_class(config.email.smtp_host, config.email.smtp_port) as smtp:
+        if not config.email.smtp_use_ssl:
+            smtp.starttls()
         smtp.login(config.email.smtp_username, password)
         smtp.send_message(message)
