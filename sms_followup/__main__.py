@@ -81,7 +81,11 @@ def _load_dotenv(path: Path) -> None:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+        os.environ.setdefault(key.strip(), _clean_env_value(value))
+
+
+def _clean_env_value(value: str) -> str:
+    return value.strip().strip('"').strip("'").replace("\u00a0", " ")
 
 
 if __name__ == "__main__":
