@@ -15,6 +15,7 @@ class EmailConfig:
     smtp_use_ssl: bool
     smtp_username: str
     smtp_password_env: str
+    smtp_password: str | None
     from_address: str
     to_address: str
     subject_prefix: str = "SMS follow-up"
@@ -67,6 +68,7 @@ def load_config(path: Path) -> Config:
             smtp_use_ssl=bool(email.get("smtp_use_ssl", int(email.get("smtp_port", 587)) == 465)),
             smtp_username=str(email["smtp_username"]),
             smtp_password_env=str(email.get("smtp_password_env", "SMS_FOLLOWUP_SMTP_PASSWORD")),
+            smtp_password=str(email["smtp_password"]) if email.get("smtp_password") else None,
             from_address=str(email["from_address"]),
             to_address=str(email["to_address"]),
             subject_prefix=str(email.get("subject_prefix", "SMS follow-up")),

@@ -8,9 +8,12 @@ from .config import Config
 
 
 def send_email(subject: str, body: str, config: Config) -> None:
-    password = os.environ.get(config.email.smtp_password_env)
+    password = os.environ.get(config.email.smtp_password_env) or config.email.smtp_password
     if not password:
-        raise RuntimeError(f"Missing SMTP password environment variable: {config.email.smtp_password_env}")
+        raise RuntimeError(
+            f"Missing SMTP password. Set {config.email.smtp_password_env} in .env "
+            "or smtp_password in the private config file."
+        )
 
     message = EmailMessage()
     message["Subject"] = subject
